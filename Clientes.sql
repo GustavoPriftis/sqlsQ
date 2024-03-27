@@ -1248,7 +1248,10 @@ left outer join
 	 municipio mnc on trn.idmunicipio = mnc.idmunicipio
 left outer join
 	 uf on mnc.iduf = uf.iduf
+	 
 --5. A data do pedido, o valor, o nome da transportadora, o nome do cliente e o nome do vendedor dos pedidos.
+drop view pedido_informacoes
+	 
 create view pedido_informacoes as 
 select
 	 pdd.data_pedido,
@@ -1277,8 +1280,6 @@ left outer join
 	 produto prd on pdp.idproduto = prd.idproduto
 
 --Exercícios sequences – auto incremento
-
-
 --1. Criar sequências para todas as outras tabelas da base de dados
 --a. Cliente
 select * from cliente
@@ -1492,13 +1493,188 @@ select * from bairro_auditoria
 
 --Exercícios triggers
 --1. Crie uma tabela chamada PEDIDOS_APAGADOS
-select * from pedido
+drop table pedidos_apagados
 create table pedidos_apagados(
 	idpedido integer,
 	idcliente integer,
 	idtransportadora integer,
 	idvendedor integer,
-	data_pedido date,
+	data_apagado date,
 	valor numeric
 );
 --2. Faça uma trigger que quando um pedido for apagado, todos os seus dados devem ser copiados para a tabela PEDIDOS_APAGADOS
+drop function pedido_log()
+create or replace function pedido_log() returns trigger language plpgsql as
+$$
+begin
+	 insert into pedidos_apagados(idpedido, idcliente, idtransportadora, idvendedor, data_apagado, valor) 
+	 values (old.idpedido,old.idcliente, old.idtransportadora, old.idvendedor, current_timestamp, old.valor);
+	 return old;
+end;
+$$;
+
+drop trigger log_pedidos_apagados_trigger on pedido;
+create or replace trigger log_pedidos_apagados_trigger before delete on pedido for each row execute procedure pedido_log();
+select * from pedido
+select idpedido from pedido where idpedido not in( select idpedido from pedido_produto)
+delete from pedido where idpedido in (select idpedido from pedido where idpedido not in( select idpedido from pedido_produto))
+select * from pedidos_apagados
+	 
+-- Domínios
+-- Ids
+create domain idcurto as smallint;
+create domain idmedio as integer;
+create domain idlongo as bigint;
+	 
+-- Caracteres
+create domain sigla as char (3);
+create domain codigo as varchar (10);
+create domain nome_curto as varchar(15);
+create domain nome_medio as varchar(50);
+create domain nome_longo as varchar(70);
+create domain documento as varchar(15);
+create domain tipo as char(1);
+create domain texto as text;
+
+-- Data e hora
+create domain data as date;
+create domain hora as time;
+create domain data_hora timestamp;
+
+-- Numéricos
+create domain moeda as numeric(10, 2);
+create domain float_curto as numeric(6,2);
+create domain float_medio as numeric(10, 2);
+create domain float_longo as numeric(15,2);
+create domain quantidade as smallint;
+	
+alter table bairro alter column nome type nome_medio;
+
+create view cliente_informacoes as
+select 
+	 cln.nome,
+	 prf.nome as profissao,
+	 nac.nome as nacionalidade,
+	 com.nome as complemento,
+	 mun.nome as municipio,
+	 bai.nome as bairro,
+	 cln.cpf,
+	 cln.rg,
+	 cln.data_nascimento,
+	 cln.logradouro,
+	 cln.numero,
+	 cln.observacoes,
+	 uf.sigla as unidade_de_federacao,
+	 case cln.genero
+	 	when  'M' then 'Masculino'
+	 	when 'F' then 'Feminino'
+	 end as genero
+from
+	 cliente cln
+left outer join
+	municipio mun on mun.idmunicipio = cln.idmunicipio
+left outer join
+	nacionalidade nac on nac.idnacionalidade = cln.idnacionalidade
+left outer join
+	profissao prf on prf.idprofissao = cln.idprofissao
+left outer join
+	complemento com on com.idcomplemento = cln.idcomplemento
+left outer join
+	bairro bai on bai.idbairro = cln.idbairro
+left outer join
+	uf on mun.iduf = uf.iduf
+	 
+select * from cliente_informacoes
+	 
+alter table bairro_auditoria alter column data_criacao type data_hora;
+
+drop view cliente_profissao
+drop view pedidos_informacoes
+	 
+alter table cliente alter column nome type nome_longo;
+alter table cliente alter column cpf type documento;
+alter table cliente alter column rg type documento;
+alter table cliente alter column data_nascimento type data;
+alter table cliente alter column genero type tipo;
+alter table cliente alter column logradouro type nome_longo;
+alter table cliente alter column numero type nome_curto;
+alter table cliente alter column idprofissao type idmedio;
+alter table cliente alter column idnacionalidade type idmedio;
+alter table cliente alter column idbairro type idmedio;
+alter table cliente alter column idmunicipio type idmedio;
+alter table cliente alter column idcomplemento type idmedio;
+
+alter table complemento alter column nome type nome_medio;
+
+drop view produto_fornecedor
+drop view municipio_estados
+drop view transportadora_regiao
+
+alter table fornecedor alter column nome type nome_medio;
+
+alter table municipio alter column nome type nome_medio;
+alter table municipio alter column iduf type idmedio;
+
+alter table nacionalidade alter column nome type nome_medio;
+
+alter table pedido alter column idpedido type bigint;
+alter table pedido alter column idcliente type idmedio;
+alter table pedido alter column idtransportadora type idmedio;
+alter table pedido alter column idvendedor type idmedio;
+alter table pedido alter column data_pedido type data;
+alter table pedido alter column valor type moeda;
+
+drop view produto_pedido
+
+alter table pedido_produto alter column idpedido type idlongo;
+alter table pedido_produto alter column idproduto type idmedio;
+alter table pedido_produto alter column quantidade type quantidade;
+alter table pedido_produto alter column valor_unitario type moeda;
+
+alter table pedidos_apagados alter column idpedido type idlongo;
+alter table pedidos_apagados alter column idcliente type idmedio;
+alter table pedidos_apagados alter column idtransportadora type idmedio;
+alter table pedidos_apagados alter column idvendedor type idmedio;
+alter table pedidos_apagados alter column valor type moeda;
+
+alter table produto alter column idfornecedor type idmedio;
+alter table produto alter column nome type nome_medio;
+alter table produto alter column valor type moeda;
+
+alter table profissao alter column nome type nome_medio;
+
+alter table transportadora alter column idmunicipio type idmedio;
+alter table transportadora alter column nome type nome_medio;
+alter table transportadora alter column logradouro type nome_longo;
+alter table transportadora alter column numero type nome_curto;
+
+alter table uf alter column nome type nome_medio;
+alter table uf alter column sigla type sigla;
+
+alter table vendedor alter column nome type nome_medio;
+
+-- Usuários e permissões
+
+create role gerente;
+create role estagiario;
+
+grant select, insert on bairro, cliente, complemento, fornecedor, municipio, nacionalidade, pedido, pedido_produto, transportadora, uf, vendedor to gerente with grant option;
+grant select on cliente_informacoes, pedido_informacoes to estagiario;
+
+create role maria login password '123' in role gerente;
+create role pedro login password '321' in role estagiario;
+	 
+--Exercícios usuários e permissões
+
+--1. Crie um novo papel chamado “atendente”
+create role atendente;
+	 
+--2. Defina somente permissões para o novo papel poder selecionar e incluir novos pedidos (tabelas pedido e pedido_produto). O restante do acesso deve estar bloqueado
+grant select, insert on pedido, pedido_produto to atendente
+grant all on all sequences in schema public to atendente;
+--3. Crie um novo usuário associado ao novo papel
+create user gustavo with password '5442' in role atendente
+--4. Realize testes para verificar se as permissões foram aplicadas corretamente
+select * from pedido;
+insert into pedido(idcliente, idtransportadora, idvendedor, data_pedido, valor)
+values (1, 2, 4, '2008-04-01', 5000);
